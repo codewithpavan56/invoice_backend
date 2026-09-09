@@ -156,16 +156,34 @@ def login_view(request):
                 user_id = "usr_admin_default"
                 hashed = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt(10)).decode('utf-8')
                 notifications_str = json.dumps({'email': True, 'push': True})
-                user = User.objects.create(
-                    id=user_id,
-                    username='admin',
-                    email='admin@yourdomain.com',
-                    password_hash=hashed,
-                    fullName='Administrator',
-                    avatarUrl='',
-                    notifications=notifications_str,
-                    visualPreference='light'
-                )
+                with transaction.atomic():
+                    user, _ = User.objects.get_or_create(
+                        username='admin',
+                        defaults={
+                            'id': user_id,
+                            'email': 'admin@yourdomain.com',
+                            'password_hash': hashed,
+                            'fullName': 'Administrator',
+                            'avatarUrl': '',
+                            'notifications': notifications_str,
+                            'visualPreference': 'light'
+                        }
+                    )
+                    if not Settings.objects.filter(user=user).exists():
+                        default_settings = {
+                            "general": { "yearStart": "", "yearEnd": "", "predefinedLineItems": "" },
+                            "business": { "logoUrl": "", "name": "", "address": "", "extraInfo": "", "website": "", "letterheadEnabled": False, "letterheadUrl": "", "letterheadLogoPosition": "left", "letterheadShowAddress": True },
+                            "invoice": { "prefix": "INV-", "suffix": "", "autoIncrement": True, "nextNumber": "0001", "defaultDueDays": 14, "hideAdjustField": False, "terms": "", "footer": "", "showNoticeOnViewed": True, "showNoticeOnPaid": True, "templateId": "premium", "customCSS": "body {}" },
+                            "quote": { "prefix": "QUO-", "suffix": "", "autoIncrement": True, "nextNumber": "0001", "defaultValidityDays": 15, "hideAdjustField": False, "terms": "", "footer": "", "showNoticeOnViewed": True, "showNoticeOnAccepted": True, "acceptQuoteButton": True, "acceptedQuoteAction": "notify_only", "acceptQuoteText": "", "acceptedMessage": "You have accepted the Quote.<br>We will be in touch shortly.", "declineReasonRequired": True, "declinedMessage": "You have declined the Quote.<br>We will be in touch shortly.", "templateId": "premium", "customCSS": "body {}" },
+                            "payment": { "currencySymbol": "$", "currencyPosition": "left", "thousandSeparator": ",", "decimalSeparator": ".", "numDecimals": 2, "paymentPage": "Payment", "footerText": "", "bankDetails": "", "genericPaymentLink": "", "paypalGatewayEnabled": False },
+                            "tax": { "taxInclusive": False, "taxPercentage": 0, "taxName": "Tax" },
+                            "translate": { "quoteLabel": "Quote", "quoteLabelPlural": "Quotes", "invoiceLabel": "Invoice", "invoiceLabelPlural": "Invoices", "qtyLabel": "Hrs/Qty", "serviceLabel": "Service", "rateLabel": "Rate/Price", "adjustLabel": "Adjust", "subTotalLabel": "Sub Total", "discountLabel": "Discount", "totalLabel": "Total", "totalDueLabel": "Total Due" },
+                            "emailSettings": { "senderEmail": "", "senderName": "", "bccOnClientEmails": False, "footerText": "", "templates": [] },
+                            "pdf": { "paperSize": "A4", "orientation": "portrait", "margins": "normal" },
+                            "extras": { "activityLog": True, "debugMode": False },
+                            "licenses": { "licenseKey": "", "status": "Trial" }
+                        }
+                        Settings.objects.create(user=user, settings_json=json.dumps(default_settings))
             else:
                 return JsonResponse({'error': 'Invalid email/username or password.'}, status=400)
 
