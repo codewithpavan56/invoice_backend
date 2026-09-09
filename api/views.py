@@ -44,17 +44,24 @@ def register_view(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     try:
-        data = json.loads(request.body)
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-        fullName = data.get('fullName', '')
+        data = json.loads(request.body or '{}')
+        email = (data.get('email') or '').strip()
+        password = data.get('password') or ''
+        fullName = (data.get('fullName') or data.get('name') or '').strip()
+        username = (data.get('username') or data.get('name') or data.get('fullName') or (email.split('@')[0] if email else '')).strip()
         
-        if not username or not email or not password:
-            return JsonResponse({'error': 'Username, email, and password are required.'}, status=400)
+        if not email or not password:
+            return JsonResponse({'error': 'Email and password are required.'}, status=400)
             
-        if User.objects.filter(username=username).exists() or User.objects.filter(email=email).exists():
-            return JsonResponse({'error': 'Username or email already registered.'}, status=400)
+        if not username:
+            username = email.split('@')[0]
+            
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({'error': 'An account with this email is already registered.'}, status=400)
+            
+        if User.objects.filter(username=username).exists():
+            # If auto-derived username conflicts, append timestamp suffix
+            username = f"{username}_{int(time.time()) % 10000}"
             
         user_id = f"usr_{int(time.time() * 1000)}"
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(10)).decode('utf-8')
@@ -67,7 +74,7 @@ def register_view(request):
                 username=username,
                 email=email,
                 password_hash=hashed,
-                fullName=fullName,
+                fullName=fullName or username,
                 avatarUrl='',
                 notifications=notifications_str,
                 visualPreference='light'
@@ -98,11 +105,17 @@ def register_view(request):
         response = JsonResponse({
             'success': True,
             'token': token,
+            'accessToken': token,
             'user': {
+                'id': user_id,
                 'userId': user_id,
                 'username': username,
                 'email': email,
-                'fullName': fullName
+                'fullName': fullName or username,
+                'name': fullName or username,
+                'avatarUrl': '',
+                'notifications': {'email': True, 'push': True},
+                'visualPreference': 'light'
             }
         }, status=201)
         response.set_cookie('token', token, **get_cookie_options(request))
@@ -115,26 +128,21 @@ def login_view(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     try:
-        data = json.loads(request.body)
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
+        data = json.loads(request.body or '{}')
+        identifier = (data.get('username') or data.get('email') or data.get('name') or '').strip()
+        password = data.get('password') or ''
         
-        if (not username and not email) or not password:
+        if not identifier or not password:
             return JsonResponse({'error': 'Username/Email and password are required.'}, status=400)
             
-        user = None
-        if username:
-            user = User.objects.filter(username=username).first()
-        if not user and email:
-            user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email=identifier).first() or User.objects.filter(username=identifier).first()
             
         if not user:
-            return JsonResponse({'error': 'Invalid username/email or password.'}, status=400)
+            return JsonResponse({'error': 'Invalid email/username or password.'}, status=400)
             
         # Verify password using bcrypt
         if not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
-            return JsonResponse({'error': 'Invalid username/email or password.'}, status=400)
+            return JsonResponse({'error': 'Invalid email/username or password.'}, status=400)
             
         token = jwt.encode({'userId': user.id, 'username': user.username}, JWT_SECRET, algorithm='HS256')
         
@@ -146,11 +154,14 @@ def login_view(request):
         response = JsonResponse({
             'success': True,
             'token': token,
+            'accessToken': token,
             'user': {
+                'id': user.id,
                 'userId': user.id,
                 'username': user.username,
                 'email': user.email,
                 'fullName': user.fullName,
+                'name': user.fullName or user.username,
                 'avatarUrl': user.avatarUrl,
                 'notifications': notifications,
                 'visualPreference': user.visualPreference
