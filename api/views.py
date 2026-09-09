@@ -188,20 +188,27 @@ def me_view(request):
             notifications = json.loads(user.notifications or '{}')
         except:
             notifications = {}
-        return JsonResponse({
+        user_dict = {
+            'id': user.id,
             'userId': user.id,
             'username': user.username,
             'email': user.email,
             'fullName': user.fullName,
+            'name': user.fullName or user.username,
             'avatarUrl': user.avatarUrl,
             'notifications': notifications,
             'visualPreference': user.visualPreference
-        })
+        }
+        res_data = dict(user_dict)
+        res_data['user'] = user_dict
+        return JsonResponse(res_data)
     elif request.method == 'PUT':
         try:
-            data = json.loads(request.body)
+            data = json.loads(request.body or '{}')
             if 'fullName' in data:
                 user.fullName = data['fullName']
+            if 'name' in data and not data.get('fullName'):
+                user.fullName = data['name']
             if 'avatarUrl' in data:
                 user.avatarUrl = data['avatarUrl']
             if 'notifications' in data:
@@ -215,15 +222,20 @@ def me_view(request):
             except:
                 notifications = {}
                 
-            return JsonResponse({
+            user_dict = {
+                'id': user.id,
                 'userId': user.id,
                 'username': user.username,
                 'email': user.email,
                 'fullName': user.fullName,
+                'name': user.fullName or user.username,
                 'avatarUrl': user.avatarUrl,
                 'notifications': notifications,
                 'visualPreference': user.visualPreference
-            })
+            }
+            res_data = dict(user_dict)
+            res_data['user'] = user_dict
+            return JsonResponse(res_data)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     else:
