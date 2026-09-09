@@ -100,24 +100,37 @@ def register_view(request):
                 settings_json=json.dumps(default_settings)
             )
             
-        token = jwt.encode({'userId': user_id, 'username': username}, JWT_SECRET, algorithm='HS256')
+        token_payload = {
+            'userId': user_id,
+            'id': user_id,
+            'user_id': user_id,
+            'sub': user_id,
+            'username': username,
+            'email': email
+        }
+        token = jwt.encode(token_payload, JWT_SECRET, algorithm='HS256')
         
-        response = JsonResponse({
+        user_dict = {
+            'id': user_id,
+            'userId': user_id,
+            'username': username,
+            'email': email,
+            'fullName': fullName or username,
+            'name': fullName or username,
+            'avatarUrl': '',
+            'notifications': {'email': True, 'push': True},
+            'visualPreference': 'light'
+        }
+        
+        response_payload = {
             'success': True,
             'token': token,
             'accessToken': token,
-            'user': {
-                'id': user_id,
-                'userId': user_id,
-                'username': username,
-                'email': email,
-                'fullName': fullName or username,
-                'name': fullName or username,
-                'avatarUrl': '',
-                'notifications': {'email': True, 'push': True},
-                'visualPreference': 'light'
-            }
-        }, status=201)
+            'jwt': token,
+            'user': user_dict,
+            **user_dict
+        }
+        response = JsonResponse(response_payload, status=201)
         response.set_cookie('token', token, **get_cookie_options(request))
         return response
     except Exception as e:
@@ -141,32 +154,45 @@ def login_view(request):
             return JsonResponse({'error': 'Invalid email/username or password.'}, status=400)
             
         # Verify password using bcrypt
-        if not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+        if not bcrypt.checkpw(str(password).encode('utf-8'), str(user.password_hash).encode('utf-8')):
             return JsonResponse({'error': 'Invalid email/username or password.'}, status=400)
             
-        token = jwt.encode({'userId': user.id, 'username': user.username}, JWT_SECRET, algorithm='HS256')
+        token_payload = {
+            'userId': user.id,
+            'id': user.id,
+            'user_id': user.id,
+            'sub': user.id,
+            'username': user.username,
+            'email': user.email
+        }
+        token = jwt.encode(token_payload, JWT_SECRET, algorithm='HS256')
         
         try:
             notifications = json.loads(user.notifications or '{}')
         except:
             notifications = {}
             
-        response = JsonResponse({
+        user_dict = {
+            'id': user.id,
+            'userId': user.id,
+            'username': user.username,
+            'email': user.email,
+            'fullName': user.fullName,
+            'name': user.fullName or user.username,
+            'avatarUrl': user.avatarUrl,
+            'notifications': notifications,
+            'visualPreference': user.visualPreference
+        }
+        
+        response_payload = {
             'success': True,
             'token': token,
             'accessToken': token,
-            'user': {
-                'id': user.id,
-                'userId': user.id,
-                'username': user.username,
-                'email': user.email,
-                'fullName': user.fullName,
-                'name': user.fullName or user.username,
-                'avatarUrl': user.avatarUrl,
-                'notifications': notifications,
-                'visualPreference': user.visualPreference
-            }
-        })
+            'jwt': token,
+            'user': user_dict,
+            **user_dict
+        }
+        response = JsonResponse(response_payload, status=200)
         response.set_cookie('token', token, **get_cookie_options(request))
         return response
     except Exception as e:

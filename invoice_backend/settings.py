@@ -60,18 +60,29 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+APPEND_SLASH = False
 
 # CORS configuration
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 CORS_ALLOW_HEADERS = [
-    'content-type',
-    'authorization',
-    'cookie',
     'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'cookie',
+    'dnt',
     'origin',
     'user-agent',
+    'x-access-token',
     'x-csrftoken',
     'x-requested-with',
 ]
