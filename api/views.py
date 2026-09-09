@@ -14,6 +14,19 @@ COOKIE_OPTIONS = {
     'max_age': 7 * 24 * 60 * 60, # 7 days
 }
 
+def get_cookie_options(request):
+    is_secure = request.is_secure() or request.headers.get('X-Forwarded-Proto') == 'https'
+    opts = {
+        'httponly': True,
+        'max_age': 7 * 24 * 60 * 60,
+    }
+    if is_secure:
+        opts['samesite'] = 'None'
+        opts['secure'] = True
+    else:
+        opts['samesite'] = 'Lax'
+    return opts
+
 def require_auth(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user:
@@ -92,7 +105,7 @@ def register_view(request):
                 'fullName': fullName
             }
         }, status=201)
-        response.set_cookie('token', token, **COOKIE_OPTIONS)
+        response.set_cookie('token', token, **get_cookie_options(request))
         return response
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -143,7 +156,7 @@ def login_view(request):
                 'visualPreference': user.visualPreference
             }
         })
-        response.set_cookie('token', token, **COOKIE_OPTIONS)
+        response.set_cookie('token', token, **get_cookie_options(request))
         return response
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -151,7 +164,8 @@ def login_view(request):
 @csrf_exempt
 def logout_view(request):
     response = JsonResponse({'success': True})
-    response.delete_cookie('token', path='/', samesite='Lax', httponly=True)
+    is_secure = request.is_secure() or request.headers.get('X-Forwarded-Proto') == 'https'
+    response.delete_cookie('token', path='/', samesite='None' if is_secure else 'Lax')
     return response
 
 @csrf_exempt
