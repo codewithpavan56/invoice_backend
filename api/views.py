@@ -148,7 +148,7 @@ def login_view(request):
         if not identifier or not password:
             return JsonResponse({'error': 'Username/Email and password are required.'}, status=400)
             
-        user = User.objects.filter(email=identifier).first() or User.objects.filter(username=identifier).first()
+        user = User.objects.filter(email__iexact=identifier).first() or User.objects.filter(username__iexact=identifier).first()
 
         if not user:
             return JsonResponse({'error': 'Invalid email/username or password.'}, status=400)
