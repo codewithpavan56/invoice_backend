@@ -14,12 +14,163 @@ class ApiConfig(AppConfig):
         try:
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
+            
+            # Auto-create all required database tables if missing
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+              id TEXT PRIMARY KEY,
+              username TEXT UNIQUE NOT NULL,
+              email TEXT UNIQUE NOT NULL,
+              password_hash TEXT NOT NULL,
+              fullName TEXT,
+              avatarUrl TEXT,
+              notifications TEXT,
+              visualPreference TEXT DEFAULT 'light'
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS clients (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              email TEXT NOT NULL,
+              businessName TEXT NOT NULL,
+              address TEXT,
+              extraInfo TEXT,
+              website TEXT,
+              firstName TEXT,
+              lastName TEXT,
+              gst_no TEXT,
+              FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS invoices (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              invoiceNumber TEXT NOT NULL,
+              orderNumber TEXT,
+              clientId TEXT NOT NULL,
+              status TEXT NOT NULL,
+              createdDate TEXT NOT NULL,
+              dueDate TEXT NOT NULL,
+              subTotal REAL NOT NULL,
+              discount REAL DEFAULT 0,
+              taxRate REAL DEFAULT 0,
+              taxAmount REAL DEFAULT 0,
+              paidAmount REAL DEFAULT 0,
+              totalDue REAL NOT NULL,
+              terms TEXT,
+              footer TEXT,
+              title TEXT,
+              hsnCode TEXT,
+              quotationNumber TEXT,
+              FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+              FOREIGN KEY(clientId) REFERENCES clients(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS invoice_items (
+              id TEXT PRIMARY KEY,
+              invoice_id TEXT NOT NULL,
+              qty REAL NOT NULL,
+              title TEXT NOT NULL,
+              adjustPercent REAL DEFAULT 0,
+              rate REAL NOT NULL,
+              amount REAL NOT NULL,
+              description TEXT,
+              taxable INTEGER DEFAULT 1,
+              hsnCode TEXT,
+              FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+              id TEXT PRIMARY KEY,
+              invoice_id TEXT NOT NULL,
+              date TEXT NOT NULL,
+              amount REAL NOT NULL,
+              paymentMethod TEXT NOT NULL,
+              paymentId TEXT,
+              status TEXT DEFAULT 'Completed',
+              memo TEXT,
+              FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS quotations (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              quoteNumber TEXT NOT NULL,
+              clientId TEXT NOT NULL,
+              status TEXT NOT NULL,
+              createdDate TEXT NOT NULL,
+              validUntilDate TEXT NOT NULL,
+              subTotal REAL NOT NULL,
+              discount REAL DEFAULT 0,
+              taxRate REAL DEFAULT 0,
+              taxAmount REAL DEFAULT 0,
+              totalDue REAL NOT NULL,
+              terms TEXT,
+              footer TEXT,
+              title TEXT,
+              allowComments INTEGER DEFAULT 0,
+              reasonForDecline TEXT,
+              FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+              FOREIGN KEY(clientId) REFERENCES clients(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS quotation_items (
+              id TEXT PRIMARY KEY,
+              quotation_id TEXT NOT NULL,
+              qty REAL NOT NULL,
+              title TEXT NOT NULL,
+              adjustPercent REAL DEFAULT 0,
+              rate REAL NOT NULL,
+              amount REAL NOT NULL,
+              description TEXT,
+              taxable INTEGER DEFAULT 1,
+              FOREIGN KEY(quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+              user_id TEXT PRIMARY KEY,
+              settings_json TEXT NOT NULL,
+              FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS logs (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              timestamp TEXT NOT NULL,
+              eventType TEXT NOT NULL,
+              description TEXT NOT NULL,
+              details TEXT,
+              FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS sent_emails (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              timestamp TEXT NOT NULL,
+              recipient_to TEXT NOT NULL,
+              subject TEXT NOT NULL,
+              body TEXT NOT NULL,
+              buttonText TEXT,
+              buttonUrl TEXT,
+              FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """)
+            conn.commit()
+
             cur.execute("PRAGMA table_info(clients)")
             columns = [c[1] for c in cur.fetchall()]
             if 'gst_no' not in columns:
                 cur.execute("ALTER TABLE clients ADD COLUMN gst_no TEXT")
                 conn.commit()
-                print("Auto-migration: Added gst_no column to clients table.")
 
             cur.execute("SELECT COUNT(*) FROM users")
             count = cur.fetchone()[0]
@@ -53,3 +204,4 @@ class ApiConfig(AppConfig):
             conn.close()
         except Exception as e:
             print("Auto-migration: Failed auto-setup:", e)
+
