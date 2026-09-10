@@ -60,7 +60,7 @@ def register_view(request):
             return JsonResponse({'error': 'An account with this email is already registered.'}, status=400)
             
         if User.objects.filter(username__iexact=username).exists():
-            return JsonResponse({'error': 'An account with this username is already registered.'}, status=400)
+            username = f"{username}_{int(time.time()) % 10000}"
             
         user_id = f"usr_{int(time.time() * 1000)}"
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(10)).decode('utf-8')
